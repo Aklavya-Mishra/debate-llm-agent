@@ -9,35 +9,38 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-# Ensure the project root is in the path for imports (Vercel serverless compatibility)
-# This must happen before importing local modules
-_current_file = Path(__file__).resolve()
-_project_root = _current_file.parent.parent
-_agents_path = _project_root / "agents"
-
-# Add project root to path if agents directory exists there
-if _agents_path.exists() and str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-try:
-    from agents.debate import DebateOrchestrator
-    from agents.llm_client import LLMClient
-    from agents.models import DebateConfig, DebateResult
-except ImportError as e:
-    # Fallback: try importing from current working directory
-    import importlib.util
-    raise ImportError(
-        f"Failed to import agents module. "
-        f"Project root: {_project_root}, "
-        f"Agents path exists: {_agents_path.exists()}, "
-        f"sys.path: {sys.path[:3]}, "
-        f"Original error: {e}"
-    )
+# ============================================================================
+# Path Setup for Vercel
+# ============================================================================
+
+_current_file = Path(__file__).resolve()
+_project_root = _current_file.parent.parent
+
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+# Lazy imports to avoid issues at module load time
+DebateOrchestrator = None
+LLMClient = None
+DebateConfig = None
+DebateResult = None
+
+
+def _load_agents():
+    """Lazy load agent modules."""
+    global DebateOrchestrator, LLMClient, DebateConfig, DebateResult
+    if DebateOrchestrator is None:
+        from agents.debate import DebateOrchestrator as DO
+        from agents.llm_client import LLMClient as LC
+        from agents.models import DebateConfig as DC, DebateResult as DR
+        DebateOrchestrator = DO
+        LLMClient = LC
+        DebateConfig = DC
+        DebateResult = DR
 
 
 # ============================================================================
@@ -47,12 +50,11 @@ except ImportError as e:
 class DebateRequest(BaseModel):
     """Request body for debate endpoint."""
     question: str = Field(..., min_length=1, max_length=2000)
-    api_key: Optional[str] = Field(None, description="OpenAI API key (uses env var if not provided)")
-    base_url: Optional[str] = Field(None, description="Custom API base URL for compatible providers")
+    api_key: Optional[str] = Field(None, description="OpenAI API key")
+    base_url: Optional[str] = Field(None, description="Custom API base URL")
     model: str = Field("gpt-4o-mini", description="Model to use")
     max_rounds: int = Field(2, ge=1, le=3, description="Number of debate rounds")
     temperature: float = Field(0.7, ge=0.0, le=1.5)
-    stream: bool = Field(False, description="Enable streaming response")
 
 
 class HealthResponse(BaseModel):
@@ -67,37 +69,17 @@ class HealthResponse(BaseModel):
 
 app = FastAPI(
     title="Debate LLM Agent",
-    description="An LLM agent that debates itself before answering - showcasing multi-agent reasoning",
+    description="An LLM agent that debates itself before answering",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
 )
 
-# CORS configuration
-# In production, requests come from the same origin (Vercel serves both API + frontend)
-# These origins are allowed for local development and specific external access
-ALLOWED_ORIGINS = [
-    "http://localhost:8000",      # Local development
-    "http://127.0.0.1:8000",      # Local development (alternative)
-    "http://localhost:3000",      # If running frontend separately
-]
-
-# Add production Vercel domain from environment variable
-VERCEL_URL = os.getenv("VERCEL_URL")
-if VERCEL_URL:
-    ALLOWED_ORIGINS.append(f"https://{VERCEL_URL}")
-
-# Add custom domain if configured
-CUSTOM_DOMAIN = os.getenv("CORS_ALLOWED_ORIGIN")
-if CUSTOM_DOMAIN:
-    ALLOWED_ORIGINS.append(CUSTOM_DOMAIN)
-
+# CORS - allow all for Vercel deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,  # No cookies/auth headers needed
-    allow_methods=["GET", "POST", "OPTIONS"],  # Only methods we use
-    allow_headers=["Content-Type"],  # Only headers we need
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -107,39 +89,27 @@ app.add_middleware(
 
 @app.get("/api")
 async def api_root():
-    """API root - returns health info."""
-    return HealthResponse(status="healthy", version="1.0.0")
+    """API root."""
+    return {"status": "healthy", "version": "1.0.0"}
 
 
-@app.get("/api/health", response_model=HealthResponse)
+@app.get("/api/health")
 async def api_health():
-    """API health check."""
-    return HealthResponse(
-        status="healthy",
-        version="1.0.0"
-    )
+    """Health check."""
+    return {"status": "healthy", "version": "1.0.0"}
 
 
-@app.post("/api/debate", response_model=DebateResult)
+@app.post("/api/debate")
 async def run_debate(request: DebateRequest):
-    """Run a debate on the given question.
-    
-    The debate process:
-    1. Agent A proposes an initial answer
-    2. Agent B critiques the proposal
-    3. Agent A revises based on critique
-    4. Repeat for specified rounds
-    5. Synthesize final answer
-    
-    Returns the complete debate history and final refined answer.
-    """
+    """Run a debate on the given question."""
     try:
-        # Initialize LLM client
+        _load_agents()
+        
         api_key = request.api_key or os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise HTTPException(
                 status_code=400,
-                detail="API key required. Provide in request or set OPENAI_API_KEY environment variable."
+                detail="API key required."
             )
         
         llm_client = LLMClient(
@@ -148,7 +118,6 @@ async def run_debate(request: DebateRequest):
             model=request.model
         )
         
-        # Configure and run debate
         config = DebateConfig(
             max_rounds=request.max_rounds,
             temperature=request.temperature,
@@ -164,58 +133,3 @@ async def run_debate(request: DebateRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Debate failed: {str(e)}")
-
-
-@app.post("/api/debate/stream")
-async def run_debate_stream(request: DebateRequest):
-    """Run a debate with streaming updates.
-    
-    Returns Server-Sent Events with real-time progress.
-    """
-    import json
-    
-    async def generate():
-        try:
-            api_key = request.api_key or os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                yield f"data: {json.dumps({'type': 'error', 'content': 'API key required'})}\n\n"
-                return
-            
-            llm_client = LLMClient(
-                api_key=api_key,
-                base_url=request.base_url,
-                model=request.model
-            )
-            
-            config = DebateConfig(
-                max_rounds=request.max_rounds,
-                temperature=request.temperature,
-                model=request.model
-            )
-            
-            orchestrator = DebateOrchestrator(llm_client, config)
-            
-            async for update in orchestrator.run_debate_stream(request.question):
-                yield f"data: {json.dumps(update)}\n\n"
-            
-            yield "data: [DONE]\n\n"
-            
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
-    
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive"
-        }
-    )
-
-
-# ============================================================================
-# Vercel Handler
-# ============================================================================
-
-# For Vercel serverless deployment
-handler = app
