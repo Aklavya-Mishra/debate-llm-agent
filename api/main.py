@@ -6,7 +6,6 @@ propose, critique, and refine answers collaboratively.
 
 import os
 import sys
-from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -66,21 +65,10 @@ class HealthResponse(BaseModel):
 # Application Setup
 # ============================================================================
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan handler."""
-    # Startup
-    print("🤖 Debate LLM Agent API starting...")
-    yield
-    # Shutdown
-    print("👋 Debate LLM Agent API shutting down...")
-
-
 app = FastAPI(
     title="Debate LLM Agent",
     description="An LLM agent that debates itself before answering - showcasing multi-agent reasoning",
     version="1.0.0",
-    lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
