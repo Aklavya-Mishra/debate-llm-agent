@@ -8,8 +8,5 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# Import and expose the Flask app
-from api.main import app
-
-# Vercel looks for 'app' or 'handler'
-handler = app
+# Import the handler class (BaseHTTPRequestHandler subclass)
+from api.main import handler
