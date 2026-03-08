@@ -68,13 +68,31 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS for frontend
+# CORS configuration
+# In production, requests come from the same origin (Vercel serves both API + frontend)
+# These origins are allowed for local development and specific external access
+ALLOWED_ORIGINS = [
+    "http://localhost:8000",      # Local development
+    "http://127.0.0.1:8000",      # Local development (alternative)
+    "http://localhost:3000",      # If running frontend separately
+]
+
+# Add production Vercel domain from environment variable
+VERCEL_URL = os.getenv("VERCEL_URL")
+if VERCEL_URL:
+    ALLOWED_ORIGINS.append(f"https://{VERCEL_URL}")
+
+# Add custom domain if configured
+CUSTOM_DOMAIN = os.getenv("CORS_ALLOWED_ORIGIN")
+if CUSTOM_DOMAIN:
+    ALLOWED_ORIGINS.append(CUSTOM_DOMAIN)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,  # No cookies/auth headers needed
+    allow_methods=["GET", "POST", "OPTIONS"],  # Only methods we use
+    allow_headers=["Content-Type"],  # Only headers we need
 )
 
 
