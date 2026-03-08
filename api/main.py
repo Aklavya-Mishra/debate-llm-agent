@@ -5,23 +5,24 @@ propose, critique, and refine answers collaboratively.
 """
 
 import os
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
+# Ensure the project root is in the path for imports
+PROJECT_ROOT = Path(__file__).parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from agents.debate import DebateOrchestrator
 from agents.llm_client import LLMClient
 from agents.models import DebateConfig, DebateResult
-
-# Get the project root directory
-PROJECT_ROOT = Path(__file__).parent.parent
-PUBLIC_DIR = PROJECT_ROOT / "public"
 
 
 # ============================================================================
@@ -100,12 +101,9 @@ app.add_middleware(
 # Endpoints
 # ============================================================================
 
-@app.get("/")
-async def serve_frontend():
-    """Serve the frontend UI."""
-    index_path = PUBLIC_DIR / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
+@app.get("/api")
+async def api_root():
+    """API root - returns health info."""
     return HealthResponse(status="healthy", version="1.0.0")
 
 
