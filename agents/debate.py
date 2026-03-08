@@ -11,8 +11,8 @@ This module implements the multi-agent debate pattern:
 import re
 from typing import AsyncIterator, Optional
 
-from agents.llm_client import LLMClient
-from agents.models import DebateConfig, DebateResult, DebateRound
+from .llm_client import LLMClient
+from .models import DebateConfig, DebateResult, DebateRound
 from prompts.templates import (
     PROPOSER_PROMPT,
     CRITIC_PROMPT,

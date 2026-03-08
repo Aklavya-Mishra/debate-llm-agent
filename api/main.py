@@ -10,19 +10,35 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-# Ensure the project root is in the path for imports
-PROJECT_ROOT = Path(__file__).parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+# Ensure the project root is in the path for imports (Vercel serverless compatibility)
+# This must happen before importing local modules
+_current_file = Path(__file__).resolve()
+_project_root = _current_file.parent.parent
+_agents_path = _project_root / "agents"
+
+# Add project root to path if agents directory exists there
+if _agents_path.exists() and str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from agents.debate import DebateOrchestrator
-from agents.llm_client import LLMClient
-from agents.models import DebateConfig, DebateResult
+try:
+    from agents.debate import DebateOrchestrator
+    from agents.llm_client import LLMClient
+    from agents.models import DebateConfig, DebateResult
+except ImportError as e:
+    # Fallback: try importing from current working directory
+    import importlib.util
+    raise ImportError(
+        f"Failed to import agents module. "
+        f"Project root: {_project_root}, "
+        f"Agents path exists: {_agents_path.exists()}, "
+        f"sys.path: {sys.path[:3]}, "
+        f"Original error: {e}"
+    )
 
 
 # ============================================================================
