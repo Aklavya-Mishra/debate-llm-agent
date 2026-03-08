@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debate LLM Agent - Multi-Agent Reasoning</title>
+    <meta name="description" content="An LLM agent that debates itself before answering, showcasing multi-agent reasoning and self-critique loops.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+    
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --text-primary: #f0f0f5;
+            --text-secondary: #8888a0;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --border-color: #2a2a3a;
+            --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 50%, #06b6d4 100%);
+            --gradient-subtle: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* Animated background */
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .logo-icon {
+            font-size: 2.5rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Architecture diagram */
+        .architecture {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .arch-step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border-radius: 2rem;
+            border: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .arch-step.proposer { border-color: rgba(139, 92, 246, 0.5); }
+        .arch-step.critic { border-color: rgba(245, 158, 11, 0.5); }
+        .arch-step.final { border-color: rgba(16, 185, 129, 0.5); }
+
+        .arch-arrow {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+        }
+
+        /* Input section */
+        .input-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        textarea::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .input-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        input[type="text"],
+        input[type="password"],
+        select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        .settings-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            margin-bottom: 1rem;
+            transition: color 0.2s;
+        }
+
+        .settings-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        .settings-content {
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        .settings-content.open {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Button */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            padding: 1rem 2rem;
+            background: var(--gradient-primary);
+            border: none;
+            border-radius: 0.75rem;
+            color: white;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-icon {
+            font-size: 1.2rem;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results */
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .result-icon {
+            font-size: 1.5rem;
+        }
+
+        .result-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .result-badge {
+            margin-left: auto;
+            padding: 0.25rem 0.75rem;
+            background: var(--gradient-subtle);
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            color: var(--accent-purple);
+        }
+
+        .result-content {
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            font-size: 0.95rem;
+        }
+
+        .result-content p {
+            margin-bottom: 0.75rem;
+        }
+
+        .result-content strong {
+            color: var(--text-primary);
+        }
+
+        /* Final answer styling */
+        .final-answer {
+            border-color: rgba(16, 185, 129, 0.3);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, var(--bg-card) 100%);
+        }
+
+        .final-answer .result-title {
+            color: var(--accent-green);
+        }
+
+        /* Debate rounds - conversation style */
+        .debate-round {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .debate-round:last-child {
+            border-bottom: none;
+        }
+
+        .round-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--accent-purple);
+            margin-bottom: 1.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 0.5rem;
+        }
+
+        /* Chat-style messages */
+        .chat-message {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .chat-message.agent-a {
+            flex-direction: row;
+        }
+
+        .chat-message.agent-b {
+            flex-direction: row-reverse;
+        }
+
+        .agent-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .agent-a .agent-avatar {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+        }
+
+        .agent-b .agent-avatar {
+            background: linear-gradient(135deg, var(--accent-orange), #ef4444);
+        }
+
+        .chat-bubble {
+            flex: 1;
+            max-width: 85%;
+            padding: 1rem 1.25rem;
+            border-radius: 1rem;
+            position: relative;
+        }
+
+        .agent-a .chat-bubble {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-top-left-radius: 0.25rem;
+        }
+
+        .agent-b .chat-bubble {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-top-right-radius: 0.25rem;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .agent-a .agent-name {
+            color: var(--accent-purple);
+        }
+
+        .agent-b .agent-name {
+            color: var(--accent-orange);
+        }
+
+        .chat-role {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .agent-a .chat-role {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--accent-purple);
+        }
+
+        .agent-b .chat-role {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-orange);
+        }
+
+        .chat-content {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+
+        .chat-content strong {
+            color: var(--text-primary);
+        }
+
+        /* Legacy phase styles for fallback */
+        .phase {
+            margin-bottom: 1.5rem;
+        }
+
+        .phase-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+        }
+
+        .phase-proposal .phase-label {
+            background: rgba(139, 92, 246, 0.15);
+            color: var(--accent-purple);
+        }
+
+        .phase-critique .phase-label {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-orange);
+        }
+
+        .phase-revision .phase-label {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .phase-content {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 2rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-value.confidence {
+            color: var(--accent-green);
+        }
+
+        /* Status indicator */
+        .status {
+            display: none;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .status.show {
+            display: flex;
+            animation: pulse 2s ease infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-purple);
+            border-radius: 50%;
+            animation: blink 1s ease infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .status-text {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--accent-purple);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        footer a:hover {
+            color: var(--accent-cyan);
+        }
+
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 2rem;
+            transition: border-color 0.2s;
+        }
+
+        .github-link:hover {
+            border-color: var(--accent-purple);
+        }
+
+        /* Error state */
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            color: #f87171;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    
+    <div class="container">
+        <header>
+            <div class="logo">
+                <span class="logo-icon">🤖</span>
+                <h1>Debate LLM Agent</h1>
+            </div>
+            <p class="tagline">Multi-agent reasoning through structured self-debate</p>
+            
+            <div class="architecture">
+                <div class="arch-step proposer">
+                    <span>🎯</span>
+                    <span>Agent A Proposes</span>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-step critic">
+                    <span>🔍</span>
+                    <span>Agent B Critiques</span>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-step proposer">
+                    <span>✨</span>
+                    <span>Agent A Revises</span>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-step final">
+                    <span>✅</span>
+                    <span>Final Answer</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="question">Your Question</label>
+                    <textarea 
+                        id="question" 
+                        placeholder="Ask anything... e.g., 'What are the key differences between microservices and monolithic architecture?' or 'Explain quantum computing in simple terms'"
+                        rows="4"
+                    ></textarea>
+                </div>
+
+                <div class="settings-toggle" onclick="toggleSettings()">
+                    <span id="settings-icon">▶</span>
+                    <span>Settings</span>
+                </div>
+
+                <div class="settings-content" id="settings">
+                    <div class="input-group">
+                        <label for="api-key">OpenAI API Key</label>
+                        <input 
+                            type="password" 
+                            id="api-key" 
+                            placeholder="sk-... (stored locally, never sent to our servers)"
+                        >
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="model">Model</label>
+                            <select id="model">
+                                <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+                                <option value="gpt-4o">GPT-4o (Best Quality)</option>
+                                <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="rounds">Debate Rounds</label>
+                            <select id="rounds">
+                                <option value="1">1 Round (Quick)</option>
+                                <option value="2" selected>2 Rounds (Balanced)</option>
+                                <option value="3">3 Rounds (Thorough)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-primary" id="submit-btn" onclick="runDebate()">
+                    <span class="btn-icon">⚡</span>
+                    <span>Start Debate</span>
+                </button>
+            </div>
+
+            <div class="error" id="error"></div>
+
+            <div class="status" id="status">
+                <div class="status-dot"></div>
+                <span class="status-text" id="status-text">Thinking...</span>
+            </div>
+
+            <div class="results" id="results">
+                <!-- Stats bar -->
+                <div class="stats-bar" id="stats">
+                    <div class="stat">
+                        <span class="stat-label">Rounds</span>
+                        <span class="stat-value" id="stat-rounds">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Confidence</span>
+                        <span class="stat-value confidence" id="stat-confidence">-</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Tokens</span>
+                        <span class="stat-value" id="stat-tokens">-</span>
+                    </div>
+                </div>
+
+                <!-- Final answer -->
+                <div class="result-card final-answer" id="final-answer-card">
+                    <div class="result-header">
+                        <span class="result-icon">✅</span>
+                        <span class="result-title">Final Answer</span>
+                        <span class="result-badge">Synthesized</span>
+                    </div>
+                    <div class="result-content" id="final-answer"></div>
+                </div>
+
+                <!-- Debate rounds - Agent Conversation -->
+                <div class="result-card">
+                    <div class="result-header">
+                        <span class="result-icon">💬</span>
+                        <span class="result-title">Agent Conversation</span>
+                        <span class="result-badge">Full Reasoning</span>
+                    </div>
+                    <div id="debate-rounds"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Built to showcase <strong>multi-agent reasoning</strong> and <strong>self-critique loops</strong></p>
+            <a href="https://github.com/yourusername/debate-llm-agent" class="github-link" target="_blank">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                View on GitHub
+            </a>
+        </footer>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8000' 
+            : '';
+
+        console.log('🚀 Debate LLM Agent UI Initialized');
+        console.log('📡 API Base URL:', API_BASE);
+
+        // State
+        let isLoading = false;
+
+        // Settings toggle
+        function toggleSettings() {
+            const settings = document.getElementById('settings');
+            const icon = document.getElementById('settings-icon');
+            settings.classList.toggle('open');
+            icon.textContent = settings.classList.contains('open') ? '▼' : '▶';
+            console.log('⚙️ Settings toggled:', settings.classList.contains('open') ? 'open' : 'closed');
+        }
+
+        // Show/hide status
+        function setStatus(text, show = true) {
+            const status = document.getElementById('status');
+            const statusText = document.getElementById('status-text');
+            statusText.textContent = text;
+            status.classList.toggle('show', show);
+            if (text) console.log('📊 Status:', text);
+        }
+
+        // Show error
+        function showError(message) {
+            const error = document.getElementById('error');
+            error.textContent = message;
+            error.classList.add('show');
+            console.error('❌ Error:', message);
+        }
+
+        // Hide error
+        function hideError() {
+            document.getElementById('error').classList.remove('show');
+        }
+
+        // Format content with markdown-like parsing
+        function formatContent(text) {
+            if (!text) return '';
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>')
+                .trim();
+        }
+
+        // Render debate rounds as conversation
+        function renderRounds(rounds) {
+            console.log('🔄 Rendering', rounds.length, 'debate rounds');
+            const container = document.getElementById('debate-rounds');
+            container.innerHTML = rounds.map(round => `
+                <div class="debate-round">
+                    <div class="round-header">
+                        <span>🔄</span>
+                        Round ${round.round_number} of ${rounds.length}
+                    </div>
+                    
+                    <!-- Agent A: Initial Proposal -->
+                    <div class="chat-message agent-a">
+                        <div class="agent-avatar">🎯</div>
+                        <div class="chat-bubble">
+                            <div class="chat-header">
+                                <span class="agent-name">Agent A</span>
+                                <span class="chat-role">Proposer</span>
+                            </div>
+                            <div class="chat-content">${formatContent(round.proposal)}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Agent B: Critique -->
+                    <div class="chat-message agent-b">
+                        <div class="agent-avatar">🔍</div>
+                        <div class="chat-bubble">
+                            <div class="chat-header">
+                                <span class="agent-name">Agent B</span>
+                                <span class="chat-role">Critic</span>
+                            </div>
+                            <div class="chat-content">${formatContent(round.critique)}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Agent A: Revision -->
+                    <div class="chat-message agent-a">
+                        <div class="agent-avatar">✨</div>
+                        <div class="chat-bubble">
+                            <div class="chat-header">
+                                <span class="agent-name">Agent A</span>
+                                <span class="chat-role">Revision</span>
+                            </div>
+                            <div class="chat-content">${formatContent(round.revision)}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update stats
+        function updateStats(result) {
+            document.getElementById('stat-rounds').textContent = result.rounds.length;
+            document.getElementById('stat-confidence').textContent = `${Math.round(result.confidence * 100)}%`;
+            document.getElementById('stat-tokens').textContent = result.total_tokens_used.toLocaleString();
+            console.log('📈 Stats updated - Rounds:', result.rounds.length, 'Confidence:', result.confidence, 'Tokens:', result.total_tokens_used);
+        }
+
+        // Main debate function
+        async function runDebate() {
+            if (isLoading) {
+                console.log('⏳ Already loading, ignoring request');
+                return;
+            }
+
+            const question = document.getElementById('question').value.trim();
+            const apiKey = document.getElementById('api-key').value.trim();
+            const model = document.getElementById('model').value;
+            const maxRounds = parseInt(document.getElementById('rounds').value);
+
+            console.log('🎬 Starting debate...');
+            console.log('❓ Question:', question);
+            console.log('🤖 Model:', model);
+            console.log('🔢 Max Rounds:', maxRounds);
+            console.log('🔑 API Key provided:', apiKey ? `Yes (${apiKey.substring(0, 7)}...${apiKey.substring(apiKey.length - 4)})` : 'No');
+
+            // Validation
+            if (!question) {
+                showError('Please enter a question');
+                return;
+            }
+
+            if (!apiKey) {
+                showError('Please enter your OpenAI API key in Settings');
+                toggleSettings();
+                return;
+            }
+
+            // UI state
+            isLoading = true;
+            hideError();
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('submit-btn').innerHTML = '<div class="spinner"></div><span>Debating...</span>';
+
+            try {
+                // Show status updates
+                const statusMessages = [
+                    'Agent A is thinking...',
+                    'Agent B is critiquing...',
+                    'Revising answer...',
+                    'Synthesizing final response...'
+                ];
+                let statusIndex = 0;
+                const statusInterval = setInterval(() => {
+                    setStatus(statusMessages[statusIndex % statusMessages.length]);
+                    statusIndex++;
+                }, 2500);
+
+                setStatus(statusMessages[0]);
+
+                const requestBody = {
+                    question,
+                    api_key: apiKey,
+                    model,
+                    max_rounds: maxRounds,
+                    temperature: 0.7
+                };
+
+                console.log('📤 Sending request to:', `${API_BASE}/api/debate`);
+                console.log('📦 Request body:', { ...requestBody, api_key: '[REDACTED]' });
+
+                // Make API request
+                const response = await fetch(`${API_BASE}/api/debate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                clearInterval(statusInterval);
+
+                console.log('📥 Response status:', response.status, response.statusText);
+                console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Error response body:', errorText);
+                    let error;
+                    try {
+                        error = JSON.parse(errorText);
+                    } catch {
+                        error = { detail: errorText || 'Failed to run debate' };
+                    }
+                    throw new Error(error.detail || 'Failed to run debate');
+                }
+
+                const result = await response.json();
+                console.log('✅ Response received successfully');
+                console.log('📋 Full result:', result);
+
+                // Display results
+                setStatus('', false);
+                document.getElementById('final-answer').innerHTML = formatContent(result.final_answer);
+                updateStats(result);
+                renderRounds(result.rounds);
+                document.getElementById('results').classList.add('show');
+
+                console.log('🎉 Debate completed successfully!');
+
+            } catch (error) {
+                setStatus('', false);
+                console.error('💥 Fetch error:', error);
+                console.error('💥 Error stack:', error.stack);
+                showError(error.message || 'An error occurred');
+            } finally {
+                isLoading = false;
+                document.getElementById('submit-btn').disabled = false;
+                document.getElementById('submit-btn').innerHTML = '<span class="btn-icon">⚡</span><span>Start Debate</span>';
+            }
+        }
+
+        // Clear API key on page load (fresh start each time)
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🔄 Page loaded - clearing stored API key');
+            localStorage.removeItem('debate_api_key');
+            document.getElementById('api-key').value = '';
+            console.log('✅ API key cleared');
+        });
+
+        // Enter key to submit
+        document.getElementById('question').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                console.log('⌨️ Ctrl+Enter pressed, starting debate');
+                runDebate();
+            }
+        });
+    </script>
+</body>
+</html>
