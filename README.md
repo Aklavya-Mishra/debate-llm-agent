@@ -3,13 +3,10 @@
 > An LLM agent that debates itself before answering — showcasing multi-agent reasoning and self-critique loops.
 
 ![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green?logo=fastapi&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![Vercel](https://img.shields.io/badge/Deploy-Vercel-black?logo=vercel)
 
-<p align="center">
-  <img src="docs/demo.gif" alt="Demo" width="600">
-</p>
+**Live Demo:** [debate-llm-agent.vercel.app](https://debate-llm-agent.vercel.app)
 
 ## ✨ What is this?
 
@@ -34,7 +31,7 @@ This demonstrates:
 
 ### Deploy to Vercel (Recommended)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/debate-llm-agent)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Aklavya-Mishra/debate-llm-agent)
 
 1. Click the button above
 2. Connect your GitHub account
@@ -44,7 +41,7 @@ This demonstrates:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/debate-llm-agent.git
+git clone https://github.com/Aklavya-Mishra/debate-llm-agent.git
 cd debate-llm-agent
 
 # Create virtual environment
@@ -54,8 +51,8 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the API server
-uvicorn api.main:app --reload --port 8000
+# Run with Flask dev server
+python -m flask --app api.main run --port 8000
 ```
 
 Then open `http://localhost:8000` in your browser.
@@ -72,9 +69,9 @@ debate-llm-agent/
 ├── prompts/               # Prompt templates
 │   ├── __init__.py
 │   └── templates.py       # Agent prompts
-├── api/                   # FastAPI backend
+├── api/                   # Python backend
 │   ├── __init__.py
-│   ├── main.py           # API endpoints
+│   ├── main.py           # API handler (BaseHTTPRequestHandler)
 │   └── index.py          # Vercel entry point
 ├── public/               # Frontend
 │   └── index.html        # Single-page app
@@ -138,10 +135,6 @@ Run a complete debate on a question.
 }
 ```
 
-### POST `/api/debate/stream`
-
-Stream debate progress in real-time using Server-Sent Events.
-
 ## 🎨 Features
 
 - **Beautiful UI** — Modern, responsive design with smooth animations
@@ -178,7 +171,7 @@ Works with any OpenAI-compatible API:
                           │ HTTP/SSE
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│                    FastAPI Backend                       │
+│                    Python Backend                        │
 │                     api/main.py                          │
 └─────────────────────────┬───────────────────────────────┘
                           │
